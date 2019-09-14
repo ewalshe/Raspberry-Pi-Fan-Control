@@ -5,47 +5,53 @@ import signal
 import sys
 import RPi.GPIO as GPIO
 
-pin = 18 # The pin ID, edit here to change it
-maxTMP = 70 # The maximum temperature in Celsius after which we trigger the fan
-stopTMP = maxTMP - 10
+fan_control_gpio_pin = 18
+fan_trigger_temperature = 70.0  # The temperature in Celsius above which we trigger the fan
+fan_switch_off_temperature = fan_trigger_temperature - 15.0
 
-def setup():
+
+def initialise_gpio():
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(pin, GPIO.OUT)
+    GPIO.setup(fan_control_gpio_pin, GPIO.OUT)
     GPIO.setwarnings(False)
-    return()
-    
-def getCPUtemperature():
+    return
+
+
+def get_cpu_temperature():
     res = os.popen("vcgencmd measure_temp").readline()
-    # print(res)
     temp = re.findall("\d+\.\d+", res)[0]
-    print("temp is {0}".format(temp)) #Uncomment here for testing
-    return temp
-    
-def fanON():
-    setPin(True)
-    return()
-    
-def fanOFF():
-    setPin(False)
-    return()
-    
-def getTEMP():
-    CPU_temp = float(getCPUtemperature())
-    if CPU_temp > maxTMP:
-        fanON()
-    elif CPU_temp < stopTMP:
-        fanOFF()
-    return()
-    
-def setPin(mode): # A little redundant function but useful if you want to add logging
-    GPIO.output(pin, mode)
-    return()
-    
+    print("CPU temperature is {0}".format(temp))
+    return float(temp)
+
+
+def set_pin(mode):
+    GPIO.output(fan_control_gpio_pin, mode)
+    return
+
+
+def fan_on():
+    set_pin(True)
+    return
+
+
+def fan_off():
+    set_pin(False)
+    return
+
+
+def check_cpu_temperature_and_activate_fan_if_necessary():
+    cpu_temp = get_cpu_temperature()
+    if cpu_temp > fan_trigger_temperature:
+        fan_on()
+    elif cpu_temp < fan_switch_off_temperature:
+        fan_off()
+    return
+
+
 try:
-    setup() 
+    initialise_gpio()
     while True:
-        getTEMP()
-        sleep(5) # Read the temperature every 5 sec, increase or decrease this limit if you want
-except KeyboardInterrupt: # trap a CTRL+C keyboard interrupt 
-    GPIO.cleanup() # resets all GPIO ports used by this program
+        check_cpu_temperature_and_activate_fan_if_necessary()
+        sleep(5)
+finally:
+    GPIO.cleanup()  # resets all GPIO ports used by this program
